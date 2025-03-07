@@ -15,17 +15,29 @@
 
 /**
  * @brief ADASDisplay类的构造函数
+ * @param camera0Path 摄像头0的设备路径
+ * @param camera1Path 摄像头1的设备路径
+ * @param camera2Path 摄像头2的设备路径
+ * @param camera3Path 摄像头3的设备路径
  * @param parent 父窗口指针
  * 
  * 初始化成员变量并调用initUI()和setupTimers()方法设置界面和定时器
  */
-ADASDisplay::ADASDisplay(QWidget *parent)
+ADASDisplay::ADASDisplay(const QString& camera0Path, const QString& camera1Path, 
+                         const QString& camera2Path, const QString& camera3Path, 
+                         QWidget *parent)
     : QMainWindow(parent)
     , m_currentSpeed(0)
     , m_alarmActive(false)
     , m_fatigueLevel(20)
     , m_camera0Active(false)
     , m_camera1Active(false)
+    , m_camera2Active(false)
+    , m_camera3Active(false)
+    , m_camera0Path(camera0Path)
+    , m_camera1Path(camera1Path)
+    , m_camera2Path(camera2Path)
+    , m_camera3Path(camera3Path)
 {
     // 设置窗口标题
     setWindowTitle("高级驾驶辅助系统");
@@ -264,31 +276,105 @@ void ADASDisplay::updateData()
  * @brief 初始化摄像头
  * @return 是否成功初始化摄像头
  * 
- * 打开/dev/video0和/dev/video2摄像头设备
+ * 打开摄像头设备
  */
 bool ADASDisplay::initCameras()
 {
-    // 尝试打开摄像头0 (/dev/video0)，使用V4L2后端
-    m_camera0Active = m_camera0.open(0, cv::CAP_V4L2);
-    if (m_camera0Active) {
-        // 设置摄像头属性
-        m_camera0.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-        m_camera0.set(cv::CAP_PROP_FRAME_HEIGHT, 360);
-        // 禁用不必要的功能，减少警告
-        m_camera0.set(cv::CAP_PROP_BUFFERSIZE, 1);
+    // 检查摄像头设备是否存在
+    bool camera0Exists = QFile::exists(m_camera0Path);
+    bool camera1Exists = QFile::exists(m_camera1Path);
+    bool camera2Exists = QFile::exists(m_camera2Path);
+    bool camera3Exists = QFile::exists(m_camera3Path);
+    
+    // 输出设备状态信息
+    std::cout << "摄像头设备状态：" << std::endl;
+    std::cout << "摄像头0 (" << m_camera0Path.toStdString() << "): " << (camera0Exists ? "存在" : "不存在") << std::endl;
+    std::cout << "摄像头1 (" << m_camera1Path.toStdString() << "): " << (camera1Exists ? "存在" : "不存在") << std::endl;
+    std::cout << "摄像头2 (" << m_camera2Path.toStdString() << "): " << (camera2Exists ? "存在" : "不存在") << std::endl;
+    std::cout << "摄像头3 (" << m_camera3Path.toStdString() << "): " << (camera3Exists ? "存在" : "不存在") << std::endl;
+    
+    // 只尝试打开存在的摄像头设备
+    // 尝试打开摄像头0
+    if (camera0Exists) {
+        m_camera0Active = m_camera0.open(m_camera0Path.toStdString(), cv::CAP_V4L2);
+        if (m_camera0Active) {
+            // 设置摄像头属性
+            m_camera0.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+            m_camera0.set(cv::CAP_PROP_FRAME_HEIGHT, 360);
+            // 禁用不必要的功能，减少警告
+            m_camera0.set(cv::CAP_PROP_BUFFERSIZE, 1);
+            // 设置更多属性以解决内存分配问题
+            m_camera0.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M','J','P','G')); // 使用MJPG格式
+            std::cout << "摄像头0初始化成功" << std::endl;
+        } else {
+            std::cout << "摄像头0打开失败" << std::endl;
+        }
+    } else {
+        m_camera0Active = false;
+        std::cout << "摄像头0设备不存在，跳过初始化" << std::endl;
     }
     
-    // 尝试打开摄像头1 (/dev/video2)，使用V4L2后端
-    m_camera1Active = m_camera1.open(2, cv::CAP_V4L2);
-    if (m_camera1Active) {
-        // 设置摄像头属性
-        m_camera1.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-        m_camera1.set(cv::CAP_PROP_FRAME_HEIGHT, 360);
-        // 禁用不必要的功能，减少警告
-        m_camera1.set(cv::CAP_PROP_BUFFERSIZE, 1);
+    // 尝试打开摄像头1
+    if (camera1Exists) {
+        m_camera1Active = m_camera1.open(m_camera1Path.toStdString(), cv::CAP_V4L2);
+        if (m_camera1Active) {
+            // 设置摄像头属性
+            m_camera1.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+            m_camera1.set(cv::CAP_PROP_FRAME_HEIGHT, 360);
+            // 禁用不必要的功能，减少警告
+            m_camera1.set(cv::CAP_PROP_BUFFERSIZE, 1);
+            // 设置更多属性以解决内存分配问题
+            m_camera1.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M','J','P','G')); // 使用MJPG格式
+            std::cout << "摄像头1初始化成功" << std::endl;
+        } else {
+            std::cout << "摄像头1打开失败" << std::endl;
+        }
+    } else {
+        m_camera1Active = false;
+        std::cout << "摄像头1设备不存在，跳过初始化" << std::endl;
     }
     
-    return m_camera0Active || m_camera1Active;
+    // 尝试打开摄像头2
+    if (camera2Exists) {
+        m_camera2Active = m_camera2.open(m_camera2Path.toStdString(), cv::CAP_V4L2);
+        if (m_camera2Active) {
+            // 设置摄像头属性
+            m_camera2.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+            m_camera2.set(cv::CAP_PROP_FRAME_HEIGHT, 360);
+            // 禁用不必要的功能，减少警告
+            m_camera2.set(cv::CAP_PROP_BUFFERSIZE, 1);
+            // 设置更多属性以解决内存分配问题
+            m_camera2.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M','J','P','G')); // 使用MJPG格式
+            std::cout << "摄像头2初始化成功" << std::endl;
+        } else {
+            std::cout << "摄像头2打开失败" << std::endl;
+        }
+    } else {
+        m_camera2Active = false;
+        std::cout << "摄像头2设备不存在，跳过初始化" << std::endl;
+    }
+    
+    // 尝试打开摄像头3
+    if (camera3Exists) {
+        m_camera3Active = m_camera3.open(m_camera3Path.toStdString(), cv::CAP_V4L2);
+        if (m_camera3Active) {
+            // 设置摄像头属性
+            m_camera3.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+            m_camera3.set(cv::CAP_PROP_FRAME_HEIGHT, 360);
+            // 禁用不必要的功能，减少警告
+            m_camera3.set(cv::CAP_PROP_BUFFERSIZE, 1);
+            // 设置更多属性以解决内存分配问题
+            m_camera3.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M','J','P','G')); // 使用MJPG格式
+            std::cout << "摄像头3初始化成功" << std::endl;
+        } else {
+            std::cout << "摄像头3打开失败" << std::endl;
+        }
+    } else {
+        m_camera3Active = false;
+        std::cout << "摄像头3设备不存在，跳过初始化" << std::endl;
+    }
+    
+    return m_camera0Active || m_camera1Active || m_camera2Active || m_camera3Active;
 }
 
 /**
@@ -307,6 +393,16 @@ void ADASDisplay::closeCameras()
         m_camera1.release();
         m_camera1Active = false;
     }
+    
+    if (m_camera2Active) {
+        m_camera2.release();
+        m_camera2Active = false;
+    }
+
+    if (m_camera3Active) {
+        m_camera3.release();
+        m_camera3Active = false;
+    }
 }
 
 /**
@@ -320,20 +416,148 @@ void ADASDisplay::updateCameraFeeds()
         // 更新真实摄像头画面
         if (m_camera0Active) {
             cv::Mat frame;
-            if (m_camera0.read(frame)) {
+            bool success = false;
+            try {
+                success = m_camera0.read(frame);
+            } catch (const cv::Exception& e) {
+                std::cerr << "摄像头0读取异常: " << e.what() << std::endl;
+            }
+            
+            if (success && !frame.empty()) {
                 QImage image = matToQImage(frame);
                 if (m_cameraLabels.size() > 0) {
                     m_cameraLabels[0]->setPixmap(QPixmap::fromImage(image));
+                }
+            } else if (!success) {
+                std::cerr << "摄像头0读取失败" << std::endl;
+                // 检查设备是否存在
+                if (QFile::exists(m_camera0Path)) {
+                    // 尝试重新初始化摄像头
+                    m_camera0.release();
+                    m_camera0Active = m_camera0.open(m_camera0Path.toStdString(), cv::CAP_V4L2);
+                    if (m_camera0Active) {
+                        m_camera0.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+                        m_camera0.set(cv::CAP_PROP_FRAME_HEIGHT, 360);
+                        m_camera0.set(cv::CAP_PROP_BUFFERSIZE, 1);
+                        m_camera0.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M','J','P','G')); // 使用MJPG格式
+                        std::cout << "摄像头0重新初始化成功" << std::endl;
+                    } else {
+                        std::cout << "摄像头0重新初始化失败" << std::endl;
+                    }
+                } else {
+                    m_camera0Active = false;
+                    std::cout << "摄像头0设备不存在，无法重新初始化" << std::endl;
                 }
             }
         }
         
         if (m_camera1Active) {
             cv::Mat frame;
-            if (m_camera1.read(frame)) {
+            bool success = false;
+            try {
+                success = m_camera1.read(frame);
+            } catch (const cv::Exception& e) {
+                std::cerr << "摄像头1读取异常: " << e.what() << std::endl;
+            }
+            
+            if (success && !frame.empty()) {
                 QImage image = matToQImage(frame);
                 if (m_cameraLabels.size() > 1) {
                     m_cameraLabels[1]->setPixmap(QPixmap::fromImage(image));
+                }
+            } else if (!success) {
+                std::cerr << "摄像头1读取失败" << std::endl;
+                // 检查设备是否存在
+                if (QFile::exists(m_camera1Path)) {
+                    // 尝试重新初始化摄像头
+                    m_camera1.release();
+                    m_camera1Active = m_camera1.open(m_camera1Path.toStdString(), cv::CAP_V4L2);
+                    if (m_camera1Active) {
+                        m_camera1.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+                        m_camera1.set(cv::CAP_PROP_FRAME_HEIGHT, 360);
+                        m_camera1.set(cv::CAP_PROP_BUFFERSIZE, 1);
+                        m_camera1.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M','J','P','G')); // 使用MJPG格式
+                        std::cout << "摄像头1重新初始化成功" << std::endl;
+                    } else {
+                        std::cout << "摄像头1重新初始化失败" << std::endl;
+                    }
+                } else {
+                    m_camera1Active = false;
+                    std::cout << "摄像头1设备不存在，无法重新初始化" << std::endl;
+                }
+            }
+        }
+        
+        if (m_camera2Active) {
+            cv::Mat frame;
+            bool success = false;
+            try {
+                success = m_camera2.read(frame);
+            } catch (const cv::Exception& e) {
+                std::cerr << "摄像头2读取异常: " << e.what() << std::endl;
+            }
+            
+            if (success && !frame.empty()) {
+                QImage image = matToQImage(frame);
+                if (m_cameraLabels.size() > 2) {
+                    m_cameraLabels[2]->setPixmap(QPixmap::fromImage(image));
+                }
+            } else if (!success) {
+                std::cerr << "摄像头2读取失败" << std::endl;
+                // 检查设备是否存在
+                if (QFile::exists(m_camera2Path)) {
+                    // 尝试重新初始化摄像头
+                    m_camera2.release();
+                    m_camera2Active = m_camera2.open(m_camera2Path.toStdString(), cv::CAP_V4L2);
+                    if (m_camera2Active) {
+                        m_camera2.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+                        m_camera2.set(cv::CAP_PROP_FRAME_HEIGHT, 360);
+                        m_camera2.set(cv::CAP_PROP_BUFFERSIZE, 1);
+                        m_camera2.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M','J','P','G')); // 使用MJPG格式
+                        std::cout << "摄像头2重新初始化成功" << std::endl;
+                    } else {
+                        std::cout << "摄像头2重新初始化失败" << std::endl;
+                    }
+                } else {
+                    m_camera2Active = false;
+                    std::cout << "摄像头2设备不存在，无法重新初始化" << std::endl;
+                }
+            }
+        }
+        
+        if (m_camera3Active) {
+            cv::Mat frame;
+            bool success = false;
+            try {
+                success = m_camera3.read(frame);
+            } catch (const cv::Exception& e) {
+                std::cerr << "摄像头3读取异常: " << e.what() << std::endl;
+            }
+            
+            if (success && !frame.empty()) {
+                QImage image = matToQImage(frame);
+                if (m_cameraLabels.size() > 3) {
+                    m_cameraLabels[3]->setPixmap(QPixmap::fromImage(image));
+                }
+            } else if (!success) {
+                std::cerr << "摄像头3读取失败" << std::endl;
+                // 检查设备是否存在
+                if (QFile::exists(m_camera3Path)) {
+                    // 尝试重新初始化摄像头
+                    m_camera3.release();
+                    m_camera3Active = m_camera3.open(m_camera3Path.toStdString(), cv::CAP_V4L2);
+                    if (m_camera3Active) {
+                        m_camera3.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+                        m_camera3.set(cv::CAP_PROP_FRAME_HEIGHT, 360);
+                        m_camera3.set(cv::CAP_PROP_BUFFERSIZE, 1);
+                        m_camera3.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M','J','P','G')); // 使用MJPG格式
+                        std::cout << "摄像头3重新初始化成功" << std::endl;
+                    } else {
+                        std::cout << "摄像头3重新初始化失败" << std::endl;
+                    }
+                } else {
+                    m_camera3Active = false;
+                    std::cout << "摄像头3设备不存在，无法重新初始化" << std::endl;
                 }
             }
         }
@@ -374,7 +598,7 @@ void ADASDisplay::simulateOtherCameras()
     m_driverFeed->setPixmap(QPixmap::fromImage(driverImage));
     
     // 只模拟摄像头2和3（索引2和3），因为0和1使用真实摄像头
-    for (int i = 2; i < 4 && i < m_cameraLabels.size(); ++i) {
+    for (int i = 3; i < 4 && i < m_cameraLabels.size(); ++i) {
         QImage image(640, 480, QImage::Format_RGB888);
         image.fill(QColor(30, 30, 30));
         
@@ -383,14 +607,15 @@ void ADASDisplay::simulateOtherCameras()
         painter.setFont(QFont("Arial", 20));
         
         // 根据索引绘制不同的模拟画面
-        if (i == 2) {
-            painter.drawText(image.rect(), Qt::AlignCenter, "车道线检测\n(模拟数据)");
+        // if (i == 2) {
+        //     painter.drawText(image.rect(), Qt::AlignCenter, "车道线检测\n(模拟数据)");
             
-            // 绘制简单的车道线
-            painter.setPen(QPen(Qt::yellow, 3));
-            painter.drawLine(160, 480, 280, 240);
-            painter.drawLine(480, 480, 360, 240);
-        } else {
+        //     // 绘制简单的车道线
+        //     painter.setPen(QPen(Qt::yellow, 3));
+        //     painter.drawLine(160, 480, 280, 240);
+        //     painter.drawLine(480, 480, 360, 240);
+        // } else
+         {
             painter.drawText(image.rect(), Qt::AlignCenter, "车辆检测\n(模拟数据)");
             
             // 绘制简单的车辆轮廓

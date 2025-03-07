@@ -93,8 +93,14 @@ industrial-display-qt-cpp/
 - `m_currentSpeed`: 当前车速
 - `m_alarmActive`: 警报激活状态
 - `m_fatigueLevel`: 疲劳度级别
-- `m_camera0`: 摄像头0（/dev/video0）
-- `m_camera1`: 摄像头1（/dev/video2）
+- `m_camera0`: 摄像头0
+- `m_camera1`: 摄像头1
+- `m_camera2`: 摄像头2
+- `m_camera3`: 摄像头3
+- `m_camera0Path`: 摄像头0的设备路径
+- `m_camera1Path`: 摄像头1的设备路径
+- `m_camera2Path`: 摄像头2的设备路径
+- `m_camera3Path`: 摄像头3的设备路径
 
 #### 主要方法
 
@@ -118,16 +124,37 @@ industrial-display-qt-cpp/
 
 摄像头显示使用QLabel组件实现，通过OpenCV读取摄像头数据：
 
-1. 在 `initCameras()`中初始化摄像头设备
-2. 在 `updateCameraFeeds()`中读取摄像头帧并更新UI
-3. 使用 `matToQImage()`将OpenCV的Mat图像转换为Qt的QImage
-4. 对于未连接的摄像头，使用 `simulateOtherCameras()`生成模拟画面
+1. 在构造函数中接收摄像头设备路径参数
+2. 在 `initCameras()`中检查摄像头设备是否存在，并初始化存在的摄像头设备
+3. 在 `updateCameraFeeds()`中读取摄像头帧并更新UI，包含错误处理和自动重连机制
+4. 使用 `matToQImage()`将OpenCV的Mat图像转换为Qt的QImage
+5. 对于未连接的摄像头，使用 `simulateOtherCameras()`生成模拟画面
 
 ```cpp
-// 读取摄像头帧并显示
+// 检查摄像头设备是否存在并初始化
+bool camera0Exists = QFile::exists(m_camera0Path);
+if (camera0Exists) {
+    m_camera0Active = m_camera0.open(m_camera0Path.toStdString(), cv::CAP_V4L2);
+    if (m_camera0Active) {
+        // 设置摄像头属性
+        m_camera0.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+        m_camera0.set(cv::CAP_PROP_FRAME_HEIGHT, 360);
+        m_camera0.set(cv::CAP_PROP_BUFFERSIZE, 1);
+        m_camera0.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M','J','P','G'));
+    }
+}
+
+// 读取摄像头帧并显示，包含错误处理
 if (m_camera0Active) {
     cv::Mat frame;
-    if (m_camera0.read(frame)) {
+    bool success = false;
+    try {
+        success = m_camera0.read(frame);
+    } catch (const cv::Exception& e) {
+        std::cerr << "摄像头0读取异常: " << e.what() << std::endl;
+    }
+    
+    if (success && !frame.empty()) {
         QImage image = matToQImage(frame);
         m_cameraLabels[0]->setPixmap(QPixmap::fromImage(image));
     }
@@ -192,6 +219,52 @@ m_currentSpeed = qBound(0.0, m_currentSpeed + speedChange, 200.0);
 5. ESC键：调用 `toggleFullScreen()`方法切换全屏模式
 
 ## 二次开发指南
+
+### 摄像头设备配置
+
+应用程序支持通过构造函数参数配置摄像头设备路径：
+
+```cpp
+/**
+ * @brief 构造函数
+ * @param camera0Path 摄像头0的设备路径，默认为"/dev/video0"
+ * @param camera1Path 摄像头1的设备路径，默认为"/dev/video2"
+ * @param camera2Path 摄像头2的设备路径，默认为"/dev/video4"
+ * @param camera3Path 摄像头3的设备路径，默认为"/dev/video6"
+ * @param parent 父窗口指针，默认为nullptr
+ */
+ADASDisplay(const QString& camera0Path = "/dev/video0", 
+            const QString& camera1Path = "/dev/video2", 
+            const QString& camera2Path = "/dev/video4", 
+            const QString& camera3Path = "/dev/video6", 
+            QWidget *parent = nullptr);
+```
+
+在主程序中可以这样使用：
+
+```cpp
+int main(int argc, char *argv[])
+{
+    QApplication app(argc, argv);
+    
+    // 使用自定义摄像头路径
+    ADASDisplay display("/dev/video0", "/dev/video2", "/dev/video4", "/dev/video6");
+    display.show();
+    
+    return app.exec();
+}
+```
+
+### 摄像头设备健壮性处理
+
+应用程序实现了摄像头设备的健壮性处理机制：
+
+1. **设备存在性检查**：在初始化和重连时，先检查设备是否存在
+2. **异常处理**：捕获摄像头操作中可能出现的异常
+3. **自动重连**：当摄像头读取失败时，自动尝试重新初始化
+4. **详细日志**：输出详细的摄像头状态和错误信息，便于调试
+
+这些机制确保了应用程序在摄像头设备不存在或出现问题时能够优雅地处理，而不会崩溃或卡死。
 
 ### 添加新功能
 

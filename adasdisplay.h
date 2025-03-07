@@ -47,9 +47,17 @@ class ADASDisplay : public QMainWindow
 public:
     /**
      * @brief 构造函数
+     * @param camera0Path 摄像头0的设备路径，默认为"/dev/video0"
+     * @param camera1Path 摄像头1的设备路径，默认为"/dev/video2"
+     * @param camera2Path 摄像头2的设备路径，默认为"/dev/video4"
+     * @param camera3Path 摄像头3的设备路径，默认为"/dev/video6"
      * @param parent 父窗口指针，默认为nullptr
      */
-    ADASDisplay(QWidget *parent = nullptr);
+    ADASDisplay(const QString& camera0Path = "/dev/video0", 
+                const QString& camera1Path = "/dev/video2", 
+                const QString& camera2Path = "/dev/video4", 
+                const QString& camera3Path = "/dev/video6", 
+                QWidget *parent = nullptr);
     
     /**
      * @brief 析构函数
@@ -189,8 +197,18 @@ private:
     // OpenCV摄像头
     cv::VideoCapture m_camera0;      ///< 摄像头0 (/dev/video0)
     cv::VideoCapture m_camera1;      ///< 摄像头1 (/dev/video2)
+    cv::VideoCapture m_camera2;      ///< 摄像头2 (/dev/video4)
+    cv::VideoCapture m_camera3;      ///< 摄像头3 (/dev/video6)
+    // 摄像头状态
     bool m_camera0Active;            ///< 摄像头0是否激活
     bool m_camera1Active;            ///< 摄像头1是否激活
+    bool m_camera2Active;            ///< 摄像头2是否激活
+    bool m_camera3Active;            ///< 摄像头3是否激活
+    // 摄像头设备路径
+    QString m_camera0Path;           ///< 摄像头0的设备路径
+    QString m_camera1Path;           ///< 摄像头1的设备路径
+    QString m_camera2Path;           ///< 摄像头2的设备路径
+    QString m_camera3Path;           ///< 摄像头3的设备路径
 };
 
 #endif // ADASDISPLAY_H
