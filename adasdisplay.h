@@ -58,7 +58,7 @@ public:
     
 public slots:
     /**
-     * @brief 交换两个摄像头的位置
+     * @brief 交换两个摄像头的位置（已禁用）
      * @param sourcePos 源摄像头位置
      * @param targetPos 目标摄像头位置
      */
@@ -105,6 +105,18 @@ private slots:
      */
     void updateCameraFeeds();
     
+    /**
+     * @brief 切换全屏模式
+     */
+    void toggleFullScreen();
+    
+    /**
+     * @brief 模拟其他摄像头画面
+     * 
+     * 生成模拟的摄像头画面用于演示
+     */
+    void simulateOtherCameras();
+    
 private:
     /**
      * @brief 初始化用户界面
@@ -140,9 +152,19 @@ private:
      */
     QImage matToQImage(const cv::Mat& mat);
     
+    /**
+     * @brief 创建应用程序图标
+     * @return 应用程序图标
+     */
+    QIcon createAppIcon();
+    
     // 摄像头面板
-    DraggableCameraPanel *m_driverCamera;     ///< 驾驶员摄像头面板
-    QVector<DraggableCameraPanel*> m_cameras; ///< 其他摄像头面板集合
+    DraggableCameraPanel *m_driverCamera;     ///< 驾驶员摄像头面板（旧的，保留以避免大量修改）
+    QVector<DraggableCameraPanel*> m_cameras; ///< 其他摄像头面板集合（旧的，保留以避免大量修改）
+    
+    // 新的摄像头UI组件
+    QVector<QLabel*> m_cameraLabels;          ///< 摄像头画面标签集合
+    QLabel *m_driverFeed;                     ///< 驾驶员摄像头画面标签
     
     // 状态面板组件
     QFrame *m_statusPanel;           ///< 状态面板框架

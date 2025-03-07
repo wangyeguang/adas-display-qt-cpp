@@ -1167,7 +1167,15 @@ CMakeFiles/ADAS_System.dir/adasdisplay.cpp.o: ../adasdisplay.cpp \
   /usr/include/aarch64-linux-gnu/qt5/QtGui/qinputmethod.h \
   /usr/include/aarch64-linux-gnu/qt5/QtCore/qlocale.h \
   /usr/include/aarch64-linux-gnu/qt5/QtGui/QFont \
-  /usr/include/aarch64-linux-gnu/qt5/QtGui/qfont.h
+  /usr/include/aarch64-linux-gnu/qt5/QtGui/qfont.h \
+  /usr/include/aarch64-linux-gnu/qt5/QtCore/QDebug \
+  /usr/include/aarch64-linux-gnu/qt5/QtCore/qdebug.h \
+  /usr/include/aarch64-linux-gnu/qt5/QtCore/qtextstream.h \
+  /usr/include/aarch64-linux-gnu/qt5/QtCore/qcontiguouscache.h \
+  /usr/include/aarch64-linux-gnu/qt5/QtGui/QPainter \
+  /usr/include/aarch64-linux-gnu/qt5/QtGui/qpainter.h \
+  /usr/include/aarch64-linux-gnu/qt5/QtGui/qtextoption.h \
+  /usr/include/aarch64-linux-gnu/qt5/QtGui/qpen.h
 
 CMakeFiles/ADAS_System.dir/draggablecamerapanel.cpp.o: ../draggablecamerapanel.cpp \
   /usr/include/stdc-predef.h \
@@ -2447,9 +2455,17 @@ CMakeFiles/ADAS_System.dir/main.cpp.o: ../main.cpp \
 
 /usr/include/aarch64-linux-gnu/qt5/QtGui/QBrush:
 
+../draggablecamerapanel.cpp:
+
 /usr/include/aarch64-linux-gnu/qt5/QtGui/QPainter:
 
-../draggablecamerapanel.cpp:
+/usr/include/aarch64-linux-gnu/qt5/QtCore/qcontiguouscache.h:
+
+/usr/include/aarch64-linux-gnu/qt5/QtCore/qtextstream.h:
+
+/usr/include/aarch64-linux-gnu/qt5/QtCore/qdebug.h:
+
+/usr/include/aarch64-linux-gnu/qt5/QtCore/QDebug:
 
 /usr/include/aarch64-linux-gnu/qt5/QtGui/QFont:
 

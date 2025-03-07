@@ -9,6 +9,9 @@
 #include <QApplication>
 #include <QFont>
 #include <QRandomGenerator>
+#include <QDebug>
+#include <QPainter>
+#include <QShortcut>
 
 /**
  * @brief ADASDisplay类的构造函数
@@ -24,6 +27,22 @@ ADASDisplay::ADASDisplay(QWidget *parent)
     , m_camera0Active(false)
     , m_camera1Active(false)
 {
+    // 设置窗口标题
+    setWindowTitle("高级驾驶辅助系统");
+    
+    // 设置窗口大小为1920x1080
+    resize(1920, 1080);
+    
+    // 隐藏标题栏
+    setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
+    
+    // 设置全屏显示
+    showFullScreen();
+    
+    // 添加ESC键退出全屏快捷键
+    QShortcut *shortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
+    connect(shortcut, &QShortcut::activated, this, &ADASDisplay::toggleFullScreen);
+    
     initUI();
     setupTimers();
     
@@ -58,7 +77,10 @@ void ADASDisplay::initUI()
 {
     // 设置窗口属性
     setWindowTitle("ADAS系统");
-    setFixedSize(1280, 720);  // 7寸显示屏分辨率
+    setFixedSize(1920, 1080);  // 修改为1920x1080分辨率
+    
+    // 隐藏窗口标题栏
+    setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
     
     // 设置应用图标
     setWindowIcon(createAppIcon());
@@ -70,32 +92,56 @@ void ADASDisplay::initUI()
     QWidget *centralWidget = new QWidget();
     setCentralWidget(centralWidget);
     
-    // 主布局
-    QHBoxLayout *mainLayout = new QHBoxLayout(centralWidget);
-    mainLayout->setSpacing(5);
-    mainLayout->setContentsMargins(5, 5, 5, 5);
+    // 主布局 - 垂直布局，状态面板在底部
+    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
+    mainLayout->setSpacing(2);  // 减小间距
+    mainLayout->setContentsMargins(2, 2, 2, 2);  // 减小边距
     
-    // 右侧 - 2x2摄像头网格和状态面板的容器
-    QWidget *rightContainer = new QWidget();
-    QVBoxLayout *rightLayout = new QVBoxLayout(rightContainer);
-    rightLayout->setSpacing(5);
-    rightLayout->setContentsMargins(0, 0, 0, 0);
+    // 上部摄像头区域容器
+    QWidget *cameraContainer = new QWidget();
+    QHBoxLayout *cameraLayout = new QHBoxLayout(cameraContainer);
+    cameraLayout->setSpacing(2);  // 减小间距
+    cameraLayout->setContentsMargins(0, 0, 0, 0);  // 移除边距
     
-    // 摄像头网格 (2x2)
+    // 左侧 - 2x2摄像头网格
     QWidget *cameraGrid = new QWidget();
     QGridLayout *gridLayout = new QGridLayout(cameraGrid);
-    gridLayout->setSpacing(5);
+    gridLayout->setSpacing(2);  // 减小网格间距
+    gridLayout->setContentsMargins(0, 0, 0, 0);  // 移除边距
     
-    // 创建4个摄像头面板
+    // 创建4个摄像头面板 - 使用普通QFrame替代DraggableCameraPanel
     QVector<QPair<int, int>> positions = {
         {0, 0}, {0, 1}, {1, 0}, {1, 1}
     };
     
     for (int i = 0; i < 4; ++i) {
-        DraggableCameraPanel *camera = new DraggableCameraPanel();
-        camera->setCameraPosition(i + 1);
-        m_cameras.append(camera);
-        gridLayout->addWidget(camera, positions[i].first, positions[i].second);
+        // 创建固定的摄像头面板（不可拖拽）
+        QFrame *cameraFrame = new QFrame();
+        cameraFrame->setFrameShape(QFrame::NoFrame);
+        cameraFrame->setLineWidth(0);
+        cameraFrame->setStyleSheet("background-color: #222222;");
+        cameraFrame->setMinimumSize(450, 360);
+        
+        // 使用QGridLayout以便更好地控制填充
+        QGridLayout *frameLayout = new QGridLayout(cameraFrame);
+        frameLayout->setContentsMargins(0, 0, 0, 0);
+        frameLayout->setSpacing(0);
+        
+        // 添加摄像头画面
+        QLabel *cameraFeed = new QLabel();
+        cameraFeed->setAlignment(Qt::AlignCenter);
+        cameraFeed->setText("无信号");
+        cameraFeed->setStyleSheet("color: white;");
+        cameraFeed->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        cameraFeed->setMinimumSize(450, 360);
+        cameraFeed->setScaledContents(true);
+        
+        frameLayout->addWidget(cameraFeed, 0, 0);
+        
+        // 存储摄像头引用
+        m_cameraLabels.append(cameraFeed);
+        
+        gridLayout->addWidget(cameraFrame, positions[i].first, positions[i].second);
     }
     
     // 设置网格单元的拉伸
@@ -104,19 +150,40 @@ void ADASDisplay::initUI()
         gridLayout->setRowStretch(i, 1);
     }
     
-    rightLayout->addWidget(cameraGrid, 7);
+    // 右侧 - 驾驶员摄像头面板（不可拖拽）
+    QFrame *driverFrame = new QFrame();
+    driverFrame->setFrameShape(QFrame::NoFrame);
+    driverFrame->setLineWidth(0);
+    driverFrame->setStyleSheet("background-color: #222222;");
+    driverFrame->setFixedWidth(450);
+    driverFrame->setMinimumHeight(720);
     
-    // 底部状态面板
+    // 使用QGridLayout以便更好地控制填充
+    QGridLayout *driverLayout = new QGridLayout(driverFrame);
+    driverLayout->setContentsMargins(0, 0, 0, 0);
+    driverLayout->setSpacing(0);
+    
+    // 添加驾驶员摄像头画面
+    m_driverFeed = new QLabel();
+    m_driverFeed->setAlignment(Qt::AlignCenter);
+    m_driverFeed->setText("无信号");
+    m_driverFeed->setStyleSheet("color: white;");
+    m_driverFeed->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_driverFeed->setMinimumSize(450, 720);
+    m_driverFeed->setScaledContents(true);
+    
+    driverLayout->addWidget(m_driverFeed, 0, 0);
+    
+    // 添加摄像头区域到布局
+    cameraLayout->addWidget(cameraGrid, 4);  // 摄像头网格占比
+    cameraLayout->addWidget(driverFrame, 1);  // 驾驶员摄像头占比
+    
+    // 将摄像头容器添加到主布局
+    mainLayout->addWidget(cameraContainer, 10);  // 摄像头区域占比
+    
+    // 底部状态面板 - 扩展到整个窗口宽度
     m_statusPanel = createStatusPanel();
-    rightLayout->addWidget(m_statusPanel, 3);
-    
-    mainLayout->addWidget(rightContainer);
-    
-    // 右侧 - 驾驶员摄像头
-    m_driverCamera = new DraggableCameraPanel();
-    m_driverCamera->setCameraPosition(0);
-    m_driverCamera->setFixedWidth(250);  // 右侧驾驶员摄像头宽度
-    mainLayout->addWidget(m_driverCamera);
+    mainLayout->addWidget(m_statusPanel, 1);  // 状态面板占比
     
     // 添加状态栏
     QStatusBar *statusBar = new QStatusBar();
@@ -201,20 +268,24 @@ void ADASDisplay::updateData()
  */
 bool ADASDisplay::initCameras()
 {
-    // 尝试打开摄像头0 (/dev/video0)
-    m_camera0Active = m_camera0.open(0);
+    // 尝试打开摄像头0 (/dev/video0)，使用V4L2后端
+    m_camera0Active = m_camera0.open(0, cv::CAP_V4L2);
     if (m_camera0Active) {
         // 设置摄像头属性
         m_camera0.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-        m_camera0.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+        m_camera0.set(cv::CAP_PROP_FRAME_HEIGHT, 360);
+        // 禁用不必要的功能，减少警告
+        m_camera0.set(cv::CAP_PROP_BUFFERSIZE, 1);
     }
     
-    // 尝试打开摄像头1 (/dev/video2)
-    m_camera1Active = m_camera1.open(2);
+    // 尝试打开摄像头1 (/dev/video2)，使用V4L2后端
+    m_camera1Active = m_camera1.open(2, cv::CAP_V4L2);
     if (m_camera1Active) {
         // 设置摄像头属性
         m_camera1.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-        m_camera1.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+        m_camera1.set(cv::CAP_PROP_FRAME_HEIGHT, 360);
+        // 禁用不必要的功能，减少警告
+        m_camera1.set(cv::CAP_PROP_BUFFERSIZE, 1);
     }
     
     return m_camera0Active || m_camera1Active;
@@ -241,32 +312,97 @@ void ADASDisplay::closeCameras()
 /**
  * @brief 更新摄像头画面
  * 
- * 从摄像头获取图像并显示在对应的面板上
+ * 从摄像头获取画面并更新显示
  */
 void ADASDisplay::updateCameraFeeds()
 {
-    cv::Mat frame;
-    
-    // 更新摄像头0画面到摄像头1面板
-    if (m_camera0Active && m_camera0.isOpened()) {
-        if (m_camera0.read(frame)) {
-            if (!frame.empty() && m_cameras.size() > 0) {
-                // 转换为QImage并显示
+    try {
+        // 更新真实摄像头画面
+        if (m_camera0Active) {
+            cv::Mat frame;
+            if (m_camera0.read(frame)) {
                 QImage image = matToQImage(frame);
-                m_cameras[0]->cameraFeed()->setPixmap(QPixmap::fromImage(image));
+                if (m_cameraLabels.size() > 0) {
+                    m_cameraLabels[0]->setPixmap(QPixmap::fromImage(image));
+                }
             }
         }
+        
+        if (m_camera1Active) {
+            cv::Mat frame;
+            if (m_camera1.read(frame)) {
+                QImage image = matToQImage(frame);
+                if (m_cameraLabels.size() > 1) {
+                    m_cameraLabels[1]->setPixmap(QPixmap::fromImage(image));
+                }
+            }
+        }
+        
+        // 模拟其他摄像头画面
+        simulateOtherCameras();
+    } catch (const std::exception& e) {
+        qDebug() << "Camera update error:" << e.what();
+    } catch (...) {
+        qDebug() << "Unknown camera update error";
     }
+}
+
+/**
+ * @brief 模拟其他摄像头画面
+ * 
+ * 生成模拟的摄像头画面用于演示
+ */
+void ADASDisplay::simulateOtherCameras()
+{
+    // 模拟驾驶员监测画面
+    QImage driverImage(640, 480, QImage::Format_RGB888);
+    driverImage.fill(QColor(30, 30, 30));
     
-    // 更新摄像头1画面到摄像头2面板
-    if (m_camera1Active && m_camera1.isOpened()) {
-        if (m_camera1.read(frame)) {
-            if (!frame.empty() && m_cameras.size() > 1) {
-                // 转换为QImage并显示
-                QImage image = matToQImage(frame);
-                m_cameras[1]->cameraFeed()->setPixmap(QPixmap::fromImage(image));
-            }
+    QPainter painter(&driverImage);
+    painter.setPen(Qt::white);
+    painter.setFont(QFont("Arial", 20));
+    painter.drawText(driverImage.rect(), Qt::AlignCenter, "驾驶员监测\n(模拟数据)");
+    
+    // 绘制一个简单的人脸轮廓
+    painter.setPen(QPen(Qt::green, 2));
+    painter.drawEllipse(QPoint(320, 240), 100, 120);
+    painter.drawEllipse(QPoint(280, 210), 20, 20); // 左眼
+    painter.drawEllipse(QPoint(360, 210), 20, 20); // 右眼
+    painter.drawArc(270, 260, 100, 50, 0, 180 * 16); // 微笑
+    
+    // 更新UI
+    m_driverFeed->setPixmap(QPixmap::fromImage(driverImage));
+    
+    // 只模拟摄像头2和3（索引2和3），因为0和1使用真实摄像头
+    for (int i = 2; i < 4 && i < m_cameraLabels.size(); ++i) {
+        QImage image(640, 480, QImage::Format_RGB888);
+        image.fill(QColor(30, 30, 30));
+        
+        QPainter painter(&image);
+        painter.setPen(Qt::white);
+        painter.setFont(QFont("Arial", 20));
+        
+        // 根据索引绘制不同的模拟画面
+        if (i == 2) {
+            painter.drawText(image.rect(), Qt::AlignCenter, "车道线检测\n(模拟数据)");
+            
+            // 绘制简单的车道线
+            painter.setPen(QPen(Qt::yellow, 3));
+            painter.drawLine(160, 480, 280, 240);
+            painter.drawLine(480, 480, 360, 240);
+        } else {
+            painter.drawText(image.rect(), Qt::AlignCenter, "车辆检测\n(模拟数据)");
+            
+            // 绘制简单的车辆轮廓
+            painter.setPen(QPen(Qt::red, 2));
+            painter.drawRect(220, 280, 200, 100);
+            painter.drawRect(250, 230, 140, 50);
+            painter.drawEllipse(250, 380, 40, 40); // 左前轮
+            painter.drawEllipse(350, 380, 40, 40); // 右前轮
         }
+        
+        // 更新UI
+        m_cameraLabels[i]->setPixmap(QPixmap::fromImage(image));
     }
 }
 
@@ -306,114 +442,130 @@ QFrame* ADASDisplay::createStatusPanel()
     QFrame *frame = new QFrame();
     frame->setObjectName("statusPanel");
     frame->setFrameShape(QFrame::Box);
-    frame->setLineWidth(2);
+    frame->setLineWidth(1);  // 减小边框宽度
     frame->setStyleSheet(DATA_PANEL_STYLE);
     
     QHBoxLayout *layout = new QHBoxLayout(frame);
-    layout->setSpacing(20);
+    layout->setSpacing(5);  // 减小间距
+    layout->setContentsMargins(2, 2, 2, 2);  // 减小边距
     
     // 车速部分
     QWidget *speedWidget = new QWidget();
     QVBoxLayout *speedLayout = new QVBoxLayout(speedWidget);
+    speedLayout->setContentsMargins(1, 1, 1, 1);  // 减小边距
+    speedLayout->setSpacing(1);  // 减小间距
     
     QLabel *speedTitle = new QLabel("车速");
     speedTitle->setAlignment(Qt::AlignCenter);
-    speedTitle->setFont(QFont("Arial", 12, QFont::Bold));
+    speedTitle->setFont(QFont("Arial", 10, QFont::Bold));  // 减小字体
     
     m_speedValue = new QLabel("0 km/h");
     m_speedValue->setAlignment(Qt::AlignCenter);
-    m_speedValue->setFont(QFont("Arial", 20, QFont::Bold));
+    m_speedValue->setFont(QFont("Arial", 14, QFont::Bold));  // 减小字体
     
     m_speedProgress = new QProgressBar();
     m_speedProgress->setRange(0, 200);
     m_speedProgress->setValue(0);
+    m_speedProgress->setFixedHeight(12);  // 减小进度条高度
     
-    speedLayout->addWidget(speedTitle);
-    speedLayout->addWidget(m_speedValue);
-    speedLayout->addWidget(m_speedProgress);
-    
-    // 报警状态部分
-    QWidget *alarmWidget = new QWidget();
-    QVBoxLayout *alarmLayout = new QVBoxLayout(alarmWidget);
-    
-    QLabel *alarmTitle = new QLabel("系统状态");
-    alarmTitle->setAlignment(Qt::AlignCenter);
-    alarmTitle->setFont(QFont("Arial", 12, QFont::Bold));
-    
-    m_alarmStatus = new QLabel("正常");
-    m_alarmStatus->setAlignment(Qt::AlignCenter);
-    m_alarmStatus->setFont(QFont("Arial", 20, QFont::Bold));
-    
-    QWidget *alarmButtons = new QWidget();
-    QHBoxLayout *alarmButtonsLayout = new QHBoxLayout(alarmButtons);
-    
-    m_alarmButton = new QPushButton("触发报警");
-    connect(m_alarmButton, &QPushButton::clicked, this, &ADASDisplay::toggleAlarm);
-    
-    alarmButtonsLayout->addWidget(m_alarmButton);
-    
-    alarmLayout->addWidget(alarmTitle);
-    alarmLayout->addWidget(m_alarmStatus);
-    alarmLayout->addWidget(alarmButtons);
-    
-    // 驾驶员信息部分
-    QWidget *driverWidget = new QWidget();
-    QVBoxLayout *driverLayout = new QVBoxLayout(driverWidget);
-    
-    QLabel *driverTitle = new QLabel("驾驶员信息");
-    driverTitle->setAlignment(Qt::AlignCenter);
-    driverTitle->setFont(QFont("Arial", 12, QFont::Bold));
-    
-    m_driverStatus = new QLabel("注意力集中");
-    m_driverStatus->setAlignment(Qt::AlignCenter);
-    m_driverStatus->setFont(QFont("Arial", 16));
-    
-    m_driverFatigue = new QProgressBar();
-    m_driverFatigue->setRange(0, 100);
-    m_driverFatigue->setValue(20);
-    
-    driverLayout->addWidget(driverTitle);
-    driverLayout->addWidget(m_driverStatus);
-    driverLayout->addWidget(new QLabel("疲劳度:"));
-    driverLayout->addWidget(m_driverFatigue);
-    
-    // 控制部分
-    QWidget *controlWidget = new QWidget();
-    QVBoxLayout *controlLayout = new QVBoxLayout(controlWidget);
-    
-    QLabel *controlTitle = new QLabel("控制");
-    controlTitle->setAlignment(Qt::AlignCenter);
-    controlTitle->setFont(QFont("Arial", 12, QFont::Bold));
-    
-    QWidget *speedControls = new QWidget();
-    QHBoxLayout *speedControlsLayout = new QHBoxLayout(speedControls);
-    
-    QPushButton *increaseSpeedBtn = new QPushButton("+");
-    connect(increaseSpeedBtn, &QPushButton::clicked, this, &ADASDisplay::increaseSpeed);
+    // 添加车速调整按钮到车速部分
+    QHBoxLayout *speedControlsLayout = new QHBoxLayout();
+    speedControlsLayout->setSpacing(2);  // 减小间距
     
     QPushButton *decreaseSpeedBtn = new QPushButton("-");
+    decreaseSpeedBtn->setFixedSize(25, 20);  // 减小按钮尺寸
     connect(decreaseSpeedBtn, &QPushButton::clicked, this, &ADASDisplay::decreaseSpeed);
+    
+    QPushButton *increaseSpeedBtn = new QPushButton("+");
+    increaseSpeedBtn->setFixedSize(25, 20);  // 减小按钮尺寸
+    connect(increaseSpeedBtn, &QPushButton::clicked, this, &ADASDisplay::increaseSpeed);
     
     speedControlsLayout->addWidget(decreaseSpeedBtn);
     speedControlsLayout->addWidget(increaseSpeedBtn);
     
+    speedLayout->addWidget(speedTitle);
+    speedLayout->addWidget(m_speedValue);
+    speedLayout->addWidget(m_speedProgress);
+    speedLayout->addLayout(speedControlsLayout);
+    
+    // 合并报警状态和驾驶员信息部分
+    QWidget *statusWidget = new QWidget();
+    QVBoxLayout *statusLayout = new QVBoxLayout(statusWidget);
+    statusLayout->setContentsMargins(1, 1, 1, 1);  // 减小边距
+    statusLayout->setSpacing(1);  // 减小间距
+    
+    QHBoxLayout *statusTitleLayout = new QHBoxLayout();
+    statusTitleLayout->setSpacing(2);  // 减小间距
+    
+    QLabel *alarmTitle = new QLabel("系统状态");
+    alarmTitle->setAlignment(Qt::AlignCenter);
+    alarmTitle->setFont(QFont("Arial", 10, QFont::Bold));  // 减小字体
+    
+    QLabel *driverTitle = new QLabel("驾驶员状态");
+    driverTitle->setAlignment(Qt::AlignCenter);
+    driverTitle->setFont(QFont("Arial", 10, QFont::Bold));  // 减小字体
+    
+    statusTitleLayout->addWidget(alarmTitle);
+    statusTitleLayout->addWidget(driverTitle);
+    
+    QHBoxLayout *statusValueLayout = new QHBoxLayout();
+    statusValueLayout->setSpacing(2);  // 减小间距
+    
+    m_alarmStatus = new QLabel("正常");
+    m_alarmStatus->setAlignment(Qt::AlignCenter);
+    m_alarmStatus->setFont(QFont("Arial", 14, QFont::Bold));  // 减小字体
+    
+    m_driverStatus = new QLabel("注意力集中");
+    m_driverStatus->setAlignment(Qt::AlignCenter);
+    m_driverStatus->setFont(QFont("Arial", 14));  // 减小字体
+    
+    statusValueLayout->addWidget(m_alarmStatus);
+    statusValueLayout->addWidget(m_driverStatus);
+    
+    QHBoxLayout *statusProgressLayout = new QHBoxLayout();
+    statusProgressLayout->setSpacing(2);  // 减小间距
+    
+    QLabel *fatigueLabel = new QLabel("疲劳度:");
+    fatigueLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    fatigueLabel->setFont(QFont("Arial", 10));  // 减小字体
+    
+    m_driverFatigue = new QProgressBar();
+    m_driverFatigue->setRange(0, 100);
+    m_driverFatigue->setValue(20);
+    m_driverFatigue->setFixedHeight(12);  // 减小进度条高度
+    
+    statusProgressLayout->addWidget(fatigueLabel, 1);
+    statusProgressLayout->addWidget(m_driverFatigue, 3);
+    
+    // 添加报警按钮到状态部分
+    QHBoxLayout *alarmButtonLayout = new QHBoxLayout();
+    alarmButtonLayout->setSpacing(2);  // 减小间距
+    
+    m_alarmButton = new QPushButton("报警");
+    m_alarmButton->setFixedHeight(20);  // 减小按钮高度
+    connect(m_alarmButton, &QPushButton::clicked, this, &ADASDisplay::toggleAlarm);
+    
+    // 添加帮助和退出按钮
     QPushButton *helpButton = new QPushButton("帮助");
+    helpButton->setFixedHeight(20);  // 减小按钮高度
     connect(helpButton, &QPushButton::clicked, this, &ADASDisplay::showHelp);
     
     QPushButton *exitButton = new QPushButton("退出");
+    exitButton->setFixedHeight(20);  // 减小按钮高度
     connect(exitButton, &QPushButton::clicked, this, &ADASDisplay::closeApplication);
     
-    controlLayout->addWidget(controlTitle);
-    controlLayout->addWidget(new QLabel("车速调整:"));
-    controlLayout->addWidget(speedControls);
-    controlLayout->addWidget(helpButton);
-    controlLayout->addWidget(exitButton);
+    alarmButtonLayout->addWidget(m_alarmButton);
+    alarmButtonLayout->addWidget(helpButton);
+    alarmButtonLayout->addWidget(exitButton);
+    
+    statusLayout->addLayout(statusTitleLayout);
+    statusLayout->addLayout(statusValueLayout);
+    statusLayout->addLayout(statusProgressLayout);
+    statusLayout->addLayout(alarmButtonLayout);
     
     // 添加所有部分到主布局
     layout->addWidget(speedWidget, 1);
-    layout->addWidget(alarmWidget, 1);
-    layout->addWidget(driverWidget, 1);
-    layout->addWidget(controlWidget, 1);
+    layout->addWidget(statusWidget, 2);
     
     return frame;
 }
@@ -453,18 +605,17 @@ void ADASDisplay::decreaseSpeed()
  */
 void ADASDisplay::toggleAlarm()
 {
-    // 切换报警状态
     m_alarmActive = !m_alarmActive;
     
     if (m_alarmActive) {
-        m_alarmStatus->setText("报警");
+        m_alarmStatus->setText("警报");
         m_alarmStatus->setStyleSheet("color: red; font-weight: bold;");
-        m_alarmButton->setText("解除报警");
-        statusBar()->showMessage("系统报警已触发", 2000);
+        m_alarmButton->setText("解除");
+        statusBar()->showMessage("系统报警已激活", 2000);
     } else {
         m_alarmStatus->setText("正常");
         m_alarmStatus->setStyleSheet("color: green; font-weight: bold;");
-        m_alarmButton->setText("触发报警");
+        m_alarmButton->setText("报警");
         statusBar()->showMessage("系统报警已解除", 2000);
     }
 }
@@ -521,53 +672,6 @@ void ADASDisplay::showHelp()
 }
 
 /**
- * @brief 交换两个摄像头的位置
- * @param sourcePos 源摄像头位置
- * @param targetPos 目标摄像头位置
- * 
- * 交换两个摄像头的位置
- */
-void ADASDisplay::swapCameras(int sourcePos, int targetPos)
-{
-    // 交换两个摄像头的位置
-    if (sourcePos == targetPos) {
-        return;
-    }
-    
-    // 获取要交换的摄像头
-    DraggableCameraPanel *sourceCamera = nullptr;
-    DraggableCameraPanel *targetCamera = nullptr;
-    
-    // 查找源和目标摄像头
-    if (sourcePos == 0) {
-        sourceCamera = m_driverCamera;
-    } else if (sourcePos >= 1 && sourcePos <= m_cameras.size()) {
-        sourceCamera = m_cameras[sourcePos - 1];
-    }
-    
-    if (targetPos == 0) {
-        targetCamera = m_driverCamera;
-    } else if (targetPos >= 1 && targetPos <= m_cameras.size()) {
-        targetCamera = m_cameras[targetPos - 1];
-    }
-    
-    if (!sourceCamera || !targetCamera) {
-        return;
-    }
-    
-    // 交换摄像头画面
-    QString sourceText = sourceCamera->cameraFeed()->text();
-    QString targetText = targetCamera->cameraFeed()->text();
-    sourceCamera->cameraFeed()->setText(targetText);
-    targetCamera->cameraFeed()->setText(sourceText);
-    
-    // 更新位置
-    int tempPos = sourceCamera->cameraPosition();
-    sourceCamera->setCameraPosition(targetCamera->cameraPosition());
-    targetCamera->setCameraPosition(tempPos);
-}
-
-/**
  * @brief 更新日期时间显示
  * 
  * 获取当前日期时间并更新显示
@@ -578,4 +682,43 @@ void ADASDisplay::updateDateTime()
     QDateTime currentDateTime = QDateTime::currentDateTime();
     QString datetimeStr = currentDateTime.toString("yyyy-MM-dd hh:mm:ss");
     m_datetimeLabel->setText(datetimeStr);
+}
+
+/**
+ * @brief 交换两个摄像头的位置
+ * @param sourcePos 源摄像头位置
+ * @param targetPos 目标摄像头位置
+ * 
+ * 该功能已禁用，保留函数以兼容现有代码
+ */
+void ADASDisplay::swapCameras(int sourcePos, int targetPos)
+{
+    // 该功能已禁用
+    qDebug() << "摄像头交换功能已禁用";
+}
+
+/**
+ * @brief 创建应用程序图标
+ * @return 应用程序图标
+ * 
+ * 创建应用程序图标
+ */
+QIcon ADASDisplay::createAppIcon()
+{
+    // 创建应用程序图标
+    return QIcon(":/icon/icon.png");
+}
+
+/**
+ * @brief 切换全屏模式
+ * 
+ * 切换全屏模式并更新显示
+ */
+void ADASDisplay::toggleFullScreen()
+{
+    if (isFullScreen()) {
+        showNormal();
+    } else {
+        showFullScreen();
+    }
 }

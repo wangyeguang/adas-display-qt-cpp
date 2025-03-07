@@ -523,4 +523,14 @@ CMakeFiles/ADAS_System.dir/adasdisplay.cpp.o: \
  /usr/include/aarch64-linux-gnu/qt5/QtGui/qinputmethod.h \
  /usr/include/aarch64-linux-gnu/qt5/QtCore/qlocale.h \
  /usr/include/aarch64-linux-gnu/qt5/QtGui/QFont \
- /usr/include/aarch64-linux-gnu/qt5/QtGui/qfont.h
+ /usr/include/aarch64-linux-gnu/qt5/QtGui/qfont.h \
+ /usr/include/aarch64-linux-gnu/qt5/QtCore/QDebug \
+ /usr/include/aarch64-linux-gnu/qt5/QtCore/qdebug.h \
+ /usr/include/aarch64-linux-gnu/qt5/QtCore/qtextstream.h \
+ /usr/include/aarch64-linux-gnu/qt5/QtCore/qcontiguouscache.h \
+ /usr/include/aarch64-linux-gnu/qt5/QtGui/QPainter \
+ /usr/include/aarch64-linux-gnu/qt5/QtGui/qpainter.h \
+ /usr/include/aarch64-linux-gnu/qt5/QtGui/qtextoption.h \
+ /usr/include/aarch64-linux-gnu/qt5/QtGui/qpen.h \
+ /usr/include/aarch64-linux-gnu/qt5/QtWidgets/QShortcut \
+ /usr/include/aarch64-linux-gnu/qt5/QtWidgets/qshortcut.h
