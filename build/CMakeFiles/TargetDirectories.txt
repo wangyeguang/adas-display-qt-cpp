@@ -1,0 +1,4 @@
+/home/aidong/industrial-display-qt-cpp/build/CMakeFiles/ADAS_System.dir
+/home/aidong/industrial-display-qt-cpp/build/CMakeFiles/edit_cache.dir
+/home/aidong/industrial-display-qt-cpp/build/CMakeFiles/rebuild_cache.dir
+/home/aidong/industrial-display-qt-cpp/build/CMakeFiles/ADAS_System_autogen.dir
